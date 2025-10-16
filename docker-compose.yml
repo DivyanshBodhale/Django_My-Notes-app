@@ -1,0 +1,60 @@
+version: "3.8"
+services:
+  nginx:
+    build:
+      context: ./nginx
+    container_name: nginx
+    ports:
+      - "80:80"
+    networks:
+      - notes-app-network
+    restart: always
+    depends_on:
+      - django
+
+  db:
+    container_name: mysql
+    image: mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: test_db
+    volumes:
+      - ./mysql-data:/var/lib/mysql
+    networks:
+      - notes-app-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  django:
+    build:
+      context: .
+    container_name: django_cont
+    command: sh -c "python manage.py migrate --no-input && gunicorn notesapp.wsgi --bind 0.0.0.0:8000"
+    ports:
+      - "8000:8000"
+    env_file:
+      - ".env"
+    restart: always
+    networks:
+      - notes-app-network
+    depends_on:
+      - db
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/admin || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  mysql-data:
+
+networks:
+  notes-app-network:
